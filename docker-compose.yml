@@ -1,0 +1,42 @@
+services:
+  statistics-service-node:
+    container_name: statistics-service-node
+    build:
+      context: ./statistics-service-node
+    ports:
+      - "${STATISTICS_SERVICE_PORT:-3000}:3000"
+    environment:
+      PORT: "3000"
+      NODE_ENV: production
+    networks:
+      - matrix-network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"require('http').get('http://localhost:3000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  qr-service-go:
+    container_name: qr-service-go
+    build:
+      context: ./qr-service-go
+    ports:
+      - "${QR_SERVICE_PORT:-8080}:8080"
+    environment:
+      PORT: "8080"
+      STATISTICS_SERVICE_URL: "http://statistics-service-node:3000"
+      STATISTICS_TIMEOUT_MS: "${STATISTICS_TIMEOUT_MS:-5000}"
+    networks:
+      - matrix-network
+    depends_on:
+      statistics-service-node:
+        condition: service_healthy
+
+networks:
+  matrix-network:
+    driver: bridge

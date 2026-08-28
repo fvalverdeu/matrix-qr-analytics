@@ -1,0 +1,16 @@
+{
+  "name": "statistics-service-node",
+  "version": "1.0.0",
+  "description": "Statistics service for Matrix QR Analytics",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  }
+}
