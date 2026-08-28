@@ -59,6 +59,26 @@ func TestQRServiceDecompose_CharacterizationInvariants(t *testing.T) {
 				{-6.125, 7.0},
 			},
 		},
+		{
+			name: "wide_2x3",
+			matrix: [][]float64{
+				{1, 2, 3},
+				{4, 5, 6},
+			},
+		},
+		{
+			name: "wide_1x4",
+			matrix: [][]float64{
+				{2, -1, 0.5, 7},
+			},
+		},
+		{
+			name: "wide_rank_deficient_2x4",
+			matrix: [][]float64{
+				{1, 2, 3, 4},
+				{2, 4, 6, 8},
+			},
+		},
 	}
 
 	service := NewQRService(NewMatrixValidator(), nil)

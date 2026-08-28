@@ -1,6 +1,7 @@
 package services
 
 import (
+	"gonum.org/v1/gonum/lapack/lapack64"
 	"gonum.org/v1/gonum/mat"
 
 	"qr-service-go/internal/models"
@@ -54,16 +55,54 @@ func (s *QRService) decompose(matrix [][]float64) ([][]float64, [][]float64, err
 	}
 
 	a := mat.NewDense(rows, cols, data)
+	factor := mat.DenseCopyOf(a)
 
-	var factorization mat.QR
-	factorization.Factorize(a)
+	k := minInt(rows, cols)
+	tau := make([]float64, k)
 
-	var q mat.Dense
-	var r mat.Dense
-	factorization.QTo(&q)
-	factorization.RTo(&r)
+	work := []float64{0}
+	lapack64.Geqrf(factor.RawMatrix(), tau, work, -1)
+	work = make([]float64, int(work[0]))
+	lapack64.Geqrf(factor.RawMatrix(), tau, work, len(work))
 
-	return denseToSlice(&q), denseToSlice(&r), nil
+	r := extractR(factor, rows, cols)
+	q := generateFullQ(factor, rows, k, tau)
+
+	return denseToSlice(q), denseToSlice(r), nil
+}
+
+func extractR(factor *mat.Dense, rows, cols int) *mat.Dense {
+	r := mat.NewDense(rows, cols, nil)
+	for i := 0; i < rows; i++ {
+		for j := i; j < cols; j++ {
+			r.Set(i, j, factor.At(i, j))
+		}
+	}
+
+	return r
+}
+
+func generateFullQ(factor *mat.Dense, rows, k int, tau []float64) *mat.Dense {
+	q := mat.NewDense(rows, rows, nil)
+	for i := 0; i < rows; i++ {
+		for j := 0; j < k; j++ {
+			q.Set(i, j, factor.At(i, j))
+		}
+	}
+
+	work := []float64{0}
+	lapack64.Orgqr(q.RawMatrix(), tau, work, -1)
+	work = make([]float64, int(work[0]))
+	lapack64.Orgqr(q.RawMatrix(), tau, work, len(work))
+
+	return q
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func denseToSlice(d *mat.Dense) [][]float64 {
