@@ -16,6 +16,14 @@ type HTTPStatisticsClient struct {
 	httpClient *http.Client
 }
 
+type statisticsResponseDTO struct {
+	Max               *float64 `json:"max"`
+	Min               *float64 `json:"min"`
+	Average           *float64 `json:"average"`
+	Sum               *float64 `json:"sum"`
+	HasDiagonalMatrix *bool    `json:"hasDiagonalMatrix"`
+}
+
 func NewHTTPStatisticsClient(baseURL string, timeout time.Duration) *HTTPStatisticsClient {
 	return &HTTPStatisticsClient{
 		baseURL: strings.TrimRight(baseURL, "/"),
@@ -57,9 +65,21 @@ func (c *HTTPStatisticsClient) CalculateStatistics(q, r [][]float64) (models.Sta
 		return models.Statistics{}, newUnavailableError("Statistics service is unavailable")
 	}
 
-	var statistics models.Statistics
-	if err := json.Unmarshal(body, &statistics); err != nil {
+	var statisticsDTO statisticsResponseDTO
+	if err := json.Unmarshal(body, &statisticsDTO); err != nil {
 		return models.Statistics{}, newUnavailableError("Statistics service is unavailable")
+	}
+
+	if statisticsDTO.Max == nil || statisticsDTO.Min == nil || statisticsDTO.Average == nil || statisticsDTO.Sum == nil || statisticsDTO.HasDiagonalMatrix == nil {
+		return models.Statistics{}, newUnavailableError("Statistics service is unavailable")
+	}
+
+	statistics := models.Statistics{
+		Max:               *statisticsDTO.Max,
+		Min:               *statisticsDTO.Min,
+		Average:           *statisticsDTO.Average,
+		Sum:               *statisticsDTO.Sum,
+		HasDiagonalMatrix: *statisticsDTO.HasDiagonalMatrix,
 	}
 
 	return statistics, nil
