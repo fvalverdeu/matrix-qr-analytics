@@ -13,10 +13,12 @@ function validateMatrix(matrix, name) {
     throw new ValidationError(`${name} must be a valid matrix`);
   }
 
-  const cols = matrix[0].length;
-  if (cols === 0) {
+  const firstRow = matrix[0];
+  if (!Array.isArray(firstRow) || firstRow.length === 0) {
     throw new ValidationError(`${name} must be a valid matrix`);
   }
+
+  const cols = firstRow.length;
 
   for (const row of matrix) {
     if (!Array.isArray(row) || row.length === 0) {
