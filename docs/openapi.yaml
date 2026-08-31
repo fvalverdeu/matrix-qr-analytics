@@ -1,0 +1,312 @@
+openapi: 3.1.0
+info:
+  title: Matrix QR Analytics API
+  version: 1.0.0
+  description: >-
+    System-level API contract for Matrix QR Analytics.
+    The Go QR Service is the public facade and orchestrator that performs QR factorization,
+    then delegates statistics computation to the Node Statistics Service using HTTP.
+    The Node service is intended for internal processing and is directly exposed on localhost
+    only for development/debugging.
+
+    Note about health endpoints: both services expose GET /health on different servers.
+    OpenAPI Paths cannot represent two operations with the same method+path in a single
+    document, so this contract documents the public Go health endpoint and omits the Node
+    health operation to avoid inventing non-existent alias paths.
+servers:
+  - url: http://localhost:8080
+    description: Default local server for the public Go QR Service.
+security: []
+tags:
+  - name: QR Service
+    description: Public facade/orchestrator. Performs QR factorization and delegates statistics calculation to the Node service.
+  - name: Statistics Service
+    description: Internal service that calculates statistics from Q and R; directly reachable locally only for development/debugging.
+paths:
+  /health:
+    get:
+      tags:
+        - QR Service
+      operationId: getQrServiceHealth
+      summary: Get QR Service health status
+      description: Health check for the public Go QR Service.
+      responses:
+        '200':
+          description: QR Service is healthy.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                  - service
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  service:
+                    type: string
+                    example: qr-service-go
+              examples:
+                ok:
+                  value:
+                    status: ok
+                    service: qr-service-go
+
+  /api/v1/qr:
+    post:
+      tags:
+        - QR Service
+      operationId: calculateQr
+      summary: Factorize a matrix and aggregate statistics
+      description: >-
+        Client-facing entry point. Validates input matrix A, computes QR factorization,
+        calls the Node statistics service, and returns q, r, and statistics.
+
+        Matrix validation distinction:
+        malformed/unparsable JSON maps to INVALID_REQUEST;
+        valid JSON with invalid/missing matrix data (for example {}) maps to INVALID_MATRIX.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QRRequest'
+            examples:
+              wideMatrix:
+                summary: Wide matrix example (m < n)
+                value:
+                  matrix:
+                    - [1, 2, 3]
+                    - [4, 5, 6]
+      responses:
+        '200':
+          description: >-
+            Successful factorization and statistics aggregation.
+            For input A of shape m x n:
+            q is m x m, r is m x n, A ≈ q × r, qᵀq ≈ I, and r is upper trapezoidal.
+            Square, tall, and wide inputs are supported.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QRResponse'
+        '400':
+          description: >-
+            Request parsing or matrix validation error.
+            INVALID_REQUEST is returned for malformed/unparsable JSON.
+            INVALID_MATRIX is returned when matrix business validation fails.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                invalidRequest:
+                  summary: Malformed or unparsable request body
+                  value:
+                    error:
+                      code: INVALID_REQUEST
+                      message: Request body must be valid JSON with a matrix field
+                invalidMatrix:
+                  summary: Valid JSON but invalid matrix payload
+                  value:
+                    error:
+                      code: INVALID_MATRIX
+                      message: Matrix cannot be empty
+        '502':
+          description: Statistics service unavailable or invalid downstream response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                statisticsUnavailable:
+                  value:
+                    error:
+                      code: STATISTICS_UNAVAILABLE
+                      message: Statistics service is unavailable
+        '500':
+          description: Unexpected internal processing error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                internalError:
+                  value:
+                    error:
+                      code: INTERNAL_ERROR
+                      message: An unexpected error occurred while processing the matrix
+
+  /api/v1/statistics:
+    post:
+      tags:
+        - Statistics Service
+      operationId: calculateStatistics
+      summary: Calculate statistics from Q and R
+      description: >-
+        Internal service operation in the intended architecture.
+        Normally called by the Go QR Service, but directly exposed on localhost for
+        development/debugging.
+
+        Computes statistics across all values from both q and r.
+      servers:
+        - url: http://localhost:3000
+          description: Local Node Statistics Service endpoint for development/debugging.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StatisticsRequest'
+            examples:
+              validRequest:
+                value:
+                  q:
+                    - [1, 0]
+                    - [0, 1]
+                  r:
+                    - [2, 3]
+                    - [0, 4]
+      responses:
+        '200':
+          description: >-
+            Statistics successfully calculated.
+            max/min/sum/average use the combined values from q and r.
+            average denominator is the total number of cells in q plus r.
+            hasDiagonalMatrix is true when q OR r is diagonal.
+            A diagonal matrix must be square, and off-diagonal |value| <= 1e-10 is treated as zero.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatisticsResponse'
+              examples:
+                success:
+                  value:
+                    max: 4
+                    min: 0
+                    average: 1.375
+                    sum: 11
+                    hasDiagonalMatrix: true
+        '400':
+          description: Malformed JSON or matrix validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                malformedRequest:
+                  value:
+                    error:
+                      code: INVALID_REQUEST
+                      message: Request body must be valid JSON
+                invalidMatrices:
+                  value:
+                    error:
+                      code: INVALID_MATRICES
+                      message: q is required
+        '500':
+          description: Unexpected internal processing error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                internalError:
+                  value:
+                    error:
+                      code: INTERNAL_ERROR
+                      message: An unexpected error occurred while calculating statistics
+
+components:
+  schemas:
+    Matrix:
+      type: array
+      minItems: 1
+      items:
+        type: array
+        minItems: 1
+        items:
+          type: number
+      description: >-
+        Matrix represented as an array of numeric rows.
+        Runtime constraints: all rows must have the same length (rectangular),
+        all values must be finite numbers, and matrices may be square, tall, or wide.
+
+    QRRequest:
+      type: object
+      required:
+        - matrix
+      properties:
+        matrix:
+          $ref: '#/components/schemas/Matrix'
+
+    StatisticsRequest:
+      type: object
+      required:
+        - q
+        - r
+      properties:
+        q:
+          $ref: '#/components/schemas/Matrix'
+        r:
+          $ref: '#/components/schemas/Matrix'
+
+    StatisticsResponse:
+      type: object
+      required:
+        - max
+        - min
+        - average
+        - sum
+        - hasDiagonalMatrix
+      properties:
+        max:
+          type: number
+          description: Maximum value across all cells from q and r.
+        min:
+          type: number
+          description: Minimum value across all cells from q and r.
+        average:
+          type: number
+          description: Sum of all cells divided by total cell count across q and r.
+        sum:
+          type: number
+          description: Total sum of all cells from q and r.
+        hasDiagonalMatrix:
+          type: boolean
+          description: True when q OR r is diagonal under square-shape and epsilon rules.
+
+    QRResponse:
+      type: object
+      required:
+        - q
+        - r
+        - statistics
+      properties:
+        q:
+          $ref: '#/components/schemas/Matrix'
+        r:
+          $ref: '#/components/schemas/Matrix'
+        statistics:
+          $ref: '#/components/schemas/StatisticsResponse'
+
+    APIError:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Service-defined error code.
+        message:
+          type: string
+          description: Human-readable error message.
+
+    ErrorEnvelope:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          $ref: '#/components/schemas/APIError'
