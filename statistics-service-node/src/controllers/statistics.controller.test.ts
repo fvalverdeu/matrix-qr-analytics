@@ -1,7 +1,16 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
+import assert from 'node:assert/strict';
+import test from 'node:test';
 
-const { createStatisticsController } = require('./statistics.controller');
+import type { Request, Response } from 'express';
+
+import { createStatisticsController } from './statistics.controller';
+
+interface MockResponse {
+  statusCode: number;
+  payload: unknown;
+  status(this: MockResponse, code: number): MockResponse;
+  json(this: MockResponse, body: unknown): MockResponse;
+}
 
 test('calculateStatistics maps unexpected service errors to INTERNAL_ERROR without leaking internals', () => {
   const controller = createStatisticsController({
@@ -15,22 +24,22 @@ test('calculateStatistics maps unexpected service errors to INTERNAL_ERROR witho
       q: [[1]],
       r: [[1]],
     },
-  };
+  } as Request;
 
-  const res = {
+  const res: MockResponse = {
     statusCode: 200,
     payload: undefined,
-    status(code) {
+    status(code: number) {
       this.statusCode = code;
       return this;
     },
-    json(body) {
+    json(body: unknown) {
       this.payload = body;
       return this;
     },
   };
 
-  controller.calculateStatistics(req, res);
+  controller.calculateStatistics(req, res as unknown as Response);
 
   assert.equal(res.statusCode, 500);
   assert.deepEqual(res.payload, {

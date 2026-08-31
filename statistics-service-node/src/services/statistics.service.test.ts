@@ -1,10 +1,10 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
+import assert from 'node:assert/strict';
+import test from 'node:test';
 
-const { calculateStatistics } = require('./statistics.service');
-const { ValidationError } = require('../errors/validation.error');
+import { ValidationError } from '../errors/validation.error';
+import { calculateStatistics } from './statistics.service';
 
-function assertAlmostEqual(actual, expected, tolerance = 1e-12) {
+function assertAlmostEqual(actual: number, expected: number, tolerance = 1e-12) {
   assert.ok(Math.abs(actual - expected) <= tolerance, `expected ${actual} to be within ${tolerance} of ${expected}`);
 }
 
@@ -210,9 +210,9 @@ test('calculateStatistics diagonal semantics are preserved', () => {
 test('calculateStatistics propagates ValidationError for invalid q', () => {
   assert.throws(
     () => calculateStatistics(null, [[1]]),
-    (err) => {
-      assert.ok(err instanceof ValidationError, `expected ValidationError, got ${err?.constructor?.name}`);
-      assert.equal(err.message, 'q is required');
+    (error: unknown) => {
+      assert.ok(error instanceof ValidationError, `expected ValidationError, got ${(error as { constructor?: { name?: string } })?.constructor?.name}`);
+      assert.equal(error.message, 'q is required');
       return true;
     }
   );
@@ -221,9 +221,9 @@ test('calculateStatistics propagates ValidationError for invalid q', () => {
 test('calculateStatistics propagates ValidationError for invalid r', () => {
   assert.throws(
     () => calculateStatistics([[1]], []),
-    (err) => {
-      assert.ok(err instanceof ValidationError, `expected ValidationError, got ${err?.constructor?.name}`);
-      assert.equal(err.message, 'r must be a valid matrix');
+    (error: unknown) => {
+      assert.ok(error instanceof ValidationError, `expected ValidationError, got ${(error as { constructor?: { name?: string } })?.constructor?.name}`);
+      assert.equal(error.message, 'r must be a valid matrix');
       return true;
     }
   );

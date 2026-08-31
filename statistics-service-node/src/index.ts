@@ -1,7 +1,9 @@
-require('dotenv').config();
+import dotenv from 'dotenv';
 
-const config = require('../config');
-const { createApp } = require('./app');
+import config from '../config';
+import { createApp } from './app';
+
+dotenv.config();
 
 const app = createApp();
 
