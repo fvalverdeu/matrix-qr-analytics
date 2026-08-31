@@ -1,0 +1,453 @@
+{
+  "info": {
+    "name": "Matrix QR Analytics",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "qrBaseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "statisticsBaseUrl",
+      "value": "http://localhost:3000"
+    }
+  ],
+  "item": [
+    {
+      "name": "QR Service",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "url": "{{qrBaseUrl}}/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response is JSON\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "",
+                  "pm.test(\"Health payload values are correct\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.status).to.eql(\"ok\");",
+                  "    pm.expect(json.service).to.eql(\"qr-service-go\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "QR - Square Matrix",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"matrix\": [\n    [1, 2],\n    [3, 4]\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{qrBaseUrl}}/api/v1/qr",
+            "description": "Verifies baseline QR endpoint behavior for a square matrix input."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response is JSON\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "",
+                  "pm.test(\"Response contains q, r and statistics\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property(\"q\");",
+                  "    pm.expect(json).to.have.property(\"r\");",
+                  "    pm.expect(json).to.have.property(\"statistics\");",
+                  "    pm.expect(Array.isArray(json.q)).to.eql(true);",
+                  "    pm.expect(Array.isArray(json.r)).to.eql(true);",
+                  "    pm.expect(json.statistics).to.be.an(\"object\");",
+                  "});",
+                  "",
+                  "pm.test(\"Statistics object has expected properties\", function () {",
+                  "    const stats = pm.response.json().statistics;",
+                  "    pm.expect(stats).to.have.property(\"max\");",
+                  "    pm.expect(stats).to.have.property(\"min\");",
+                  "    pm.expect(stats).to.have.property(\"average\");",
+                  "    pm.expect(stats).to.have.property(\"sum\");",
+                  "    pm.expect(stats).to.have.property(\"hasDiagonalMatrix\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "QR - Tall Matrix",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"matrix\": [\n    [1, 2],\n    [3, 4],\n    [5, 6]\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{qrBaseUrl}}/api/v1/qr"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Tall matrix response has expected dimensions\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(Array.isArray(json.q)).to.eql(true);",
+                  "    pm.expect(Array.isArray(json.r)).to.eql(true);",
+                  "    pm.expect(json.q.length).to.eql(3);",
+                  "    pm.expect(json.r.length).to.eql(3);",
+                  "    json.q.forEach(function (row) { pm.expect(row.length).to.eql(3); });",
+                  "    json.r.forEach(function (row) { pm.expect(row.length).to.eql(2); });",
+                  "    pm.expect(json).to.have.property(\"statistics\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "QR - Wide Matrix",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"matrix\": [\n    [1, 2, 3],\n    [4, 5, 6]\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{qrBaseUrl}}/api/v1/qr",
+            "description": "Demonstrates support for m < n matrices."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Wide matrix response has expected dimensions\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(Array.isArray(json.q)).to.eql(true);",
+                  "    pm.expect(Array.isArray(json.r)).to.eql(true);",
+                  "    pm.expect(json.q.length).to.eql(2);",
+                  "    pm.expect(json.r.length).to.eql(2);",
+                  "    json.q.forEach(function (row) { pm.expect(row.length).to.eql(2); });",
+                  "    json.r.forEach(function (row) { pm.expect(row.length).to.eql(3); });",
+                  "    pm.expect(json).to.have.property(\"statistics\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "QR - Invalid Matrix",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"matrix\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{qrBaseUrl}}/api/v1/qr"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Error code is INVALID_MATRIX\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.error.code).to.eql(\"INVALID_MATRIX\");",
+                  "    pm.expect(json.error.message).to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "QR - Malformed Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"matrix\":[[1,2],[3,4]]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{qrBaseUrl}}/api/v1/qr"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Error code is INVALID_REQUEST\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.error.code).to.eql(\"INVALID_REQUEST\");",
+                  "    pm.expect(json.error.message).to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Statistics Service",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "url": "{{statisticsBaseUrl}}/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response is JSON\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "",
+                  "pm.test(\"Health payload values are correct\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.status).to.eql(\"ok\");",
+                  "    pm.expect(json.service).to.eql(\"statistics-service-node\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Statistics - Valid",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"q\": [\n    [1, 0],\n    [0, 1]\n  ],\n  \"r\": [\n    [2, 3],\n    [0, 4]\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{statisticsBaseUrl}}/api/v1/statistics",
+            "description": "Demonstrates aggregate statistics over all values in Q and R."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response is JSON\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "",
+                  "pm.test(\"Deterministic statistics values are correct\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.max).to.eql(4);",
+                  "    pm.expect(json.min).to.eql(0);",
+                  "    pm.expect(json.sum).to.eql(11);",
+                  "    pm.expect(json.average).to.eql(1.375);",
+                  "    pm.expect(json.hasDiagonalMatrix).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Statistics - Invalid Matrices",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"q\": [],\n  \"r\": [\n    [1]\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{statisticsBaseUrl}}/api/v1/statistics"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Error code is INVALID_MATRICES\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.error.code).to.eql(\"INVALID_MATRICES\");",
+                  "    pm.expect(json.error.message).to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Statistics - Malformed Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"q\":[[1]],\"r\":[[2]]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{statisticsBaseUrl}}/api/v1/statistics"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Error code is INVALID_REQUEST\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.error.code).to.eql(\"INVALID_REQUEST\");",
+                  "    pm.expect(json.error.message).to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
