@@ -1,4 +1,4 @@
-const { createApp } = require('../src/app');
+const { createApp } = require('../dist/src/app');
 
 const HOST = '127.0.0.1';
 

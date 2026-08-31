@@ -50,6 +50,7 @@ yarn-error.log*
 node_modules/
 
 dist/
+statistics-service-node/dist/
 build/
 coverage/
 

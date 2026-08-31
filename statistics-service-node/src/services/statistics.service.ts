@@ -1,8 +1,9 @@
-const { validateMatrices } = require('./matrix.validator');
+import { validateMatrices } from './matrix.validator';
+import type { Matrix, Statistics } from '../types';
 
 const DIAGONAL_EPSILON = 1e-10;
 
-function isDiagonal(matrix) {
+function isDiagonal(matrix: Matrix): boolean {
   const rows = matrix.length;
   const cols = matrix[0].length;
 
@@ -21,8 +22,8 @@ function isDiagonal(matrix) {
   return true;
 }
 
-function collectValues(q, r) {
-  const values = [];
+function collectValues(q: Matrix, r: Matrix): number[] {
+  const values: number[] = [];
 
   for (const row of q) {
     values.push(...row);
@@ -35,10 +36,10 @@ function collectValues(q, r) {
   return values;
 }
 
-function calculateStatistics(q, r) {
-  validateMatrices(q, r);
+export function calculateStatistics(q: unknown, r: unknown): Statistics {
+  const validated = validateMatrices(q, r);
 
-  const values = collectValues(q, r);
+  const values = collectValues(validated.q, validated.r);
   const sum = values.reduce((total, value) => total + value, 0);
 
   return {
@@ -46,8 +47,6 @@ function calculateStatistics(q, r) {
     min: Math.min(...values),
     average: sum / values.length,
     sum,
-    hasDiagonalMatrix: isDiagonal(q) || isDiagonal(r),
+    hasDiagonalMatrix: isDiagonal(validated.q) || isDiagonal(validated.r),
   };
 }
-
-module.exports = { calculateStatistics };

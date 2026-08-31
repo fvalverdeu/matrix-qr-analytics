@@ -1,12 +1,12 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
+import assert from 'node:assert/strict';
+import test from 'node:test';
 
-const { validateMatrix, validateMatrices } = require('./matrix.validator');
-const { ValidationError } = require('../errors/validation.error');
+import { ValidationError } from '../errors/validation.error';
+import { validateMatrices, validateMatrix } from './matrix.validator';
 
-function assertValidationError(err, expectedMessage) {
-  assert.ok(err instanceof ValidationError, `expected ValidationError, got ${err?.constructor?.name}`);
-  assert.equal(err.message, expectedMessage);
+function assertValidationError(error: unknown, expectedMessage: string) {
+  assert.ok(error instanceof ValidationError, `expected ValidationError, got ${(error as { constructor?: { name?: string } })?.constructor?.name}`);
+  assert.equal(error.message, expectedMessage);
 }
 
 test('validateMatrix accepts representative valid matrices', () => {
@@ -61,16 +61,16 @@ test('validateMatrix accepts representative valid matrices', () => {
 test('validateMatrix required-field messages for q/r', () => {
   assert.throws(
     () => validateMatrix(undefined, 'q'),
-    (err) => {
-      assertValidationError(err, 'q is required');
+    (error: unknown) => {
+      assertValidationError(error, 'q is required');
       return true;
     }
   );
 
   assert.throws(
     () => validateMatrix(null, 'r'),
-    (err) => {
-      assertValidationError(err, 'r is required');
+    (error: unknown) => {
+      assertValidationError(error, 'r is required');
       return true;
     }
   );
@@ -152,8 +152,8 @@ test('validateMatrix rejects intended invalid matrices with ValidationError', ()
   for (const tc of testCases) {
     assert.throws(
       () => validateMatrix(tc.matrix, tc.nameArg),
-      (err) => {
-        assertValidationError(err, tc.message);
+      (error: unknown) => {
+        assertValidationError(error, tc.message);
         return true;
       },
       tc.name
@@ -177,16 +177,16 @@ test('validateMatrices validates q and r orchestration', () => {
 
   assert.throws(
     () => validateMatrices([], [[1]]),
-    (err) => {
-      assertValidationError(err, 'q must be a valid matrix');
+    (error: unknown) => {
+      assertValidationError(error, 'q must be a valid matrix');
       return true;
     }
   );
 
   assert.throws(
     () => validateMatrices([[1]], []),
-    (err) => {
-      assertValidationError(err, 'r must be a valid matrix');
+    (error: unknown) => {
+      assertValidationError(error, 'r must be a valid matrix');
       return true;
     }
   );
@@ -195,8 +195,8 @@ test('validateMatrices validates q and r orchestration', () => {
 test('first row null should produce ValidationError', () => {
   assert.throws(
     () => validateMatrix([null], 'q'),
-    (err) => {
-      assertValidationError(err, 'q must be a valid matrix');
+    (error: unknown) => {
+      assertValidationError(error, 'q must be a valid matrix');
       return true;
     }
   );

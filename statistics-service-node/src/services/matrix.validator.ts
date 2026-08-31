@@ -1,6 +1,7 @@
-const { ValidationError } = require('../errors/validation.error');
+import { ValidationError } from '../errors/validation.error';
+import type { Matrix } from '../types';
 
-function validateMatrix(matrix, name) {
+export function validateMatrix(matrix: unknown, name: string): asserts matrix is Matrix {
   if (matrix === undefined || matrix === null) {
     throw new ValidationError(`${name} is required`);
   }
@@ -37,9 +38,9 @@ function validateMatrix(matrix, name) {
   }
 }
 
-function validateMatrices(q, r) {
+export function validateMatrices(q: unknown, r: unknown): { q: Matrix; r: Matrix } {
   validateMatrix(q, 'q');
   validateMatrix(r, 'r');
-}
 
-module.exports = { validateMatrix, validateMatrices };
+  return { q, r };
+}

@@ -1,9 +1,14 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
+import assert from 'node:assert/strict';
+import test from 'node:test';
 
-const { createApp } = require('./app');
+import { createApp } from './app';
 
-function createServerHarness() {
+interface ServerHarness {
+  baseUrl: string;
+  close: () => Promise<void>;
+}
+
+function createServerHarness(): Promise<ServerHarness> {
   const app = createApp();
   const server = app.listen(0, '127.0.0.1');
 
@@ -19,7 +24,7 @@ function createServerHarness() {
       const baseUrl = `http://127.0.0.1:${address.port}`;
 
       async function close() {
-        await new Promise((closeResolve, closeReject) => {
+        await new Promise<void>((closeResolve, closeReject) => {
           server.close((error) => {
             if (error) {
               closeReject(error);
