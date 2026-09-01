@@ -1,0 +1,68 @@
+timeout: "1200s"
+
+steps:
+  - id: go-test
+    name: golang:1.24
+    dir: qr-service-go
+    entrypoint: go
+    args: ["test", "./..."]
+
+  - id: go-vet
+    name: golang:1.24
+    dir: qr-service-go
+    entrypoint: go
+    args: ["vet", "./..."]
+
+  # Copy the official Go runtime into /workspace so later Node-based steps can run go.
+  - id: expose-go-runtime
+    name: golang:1.24
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        rm -rf /workspace/.ci-tools/go
+        mkdir -p /workspace/.ci-tools
+        cp -a /usr/local/go /workspace/.ci-tools/go
+        /workspace/.ci-tools/go/bin/go version
+
+  - id: node-ci
+    name: node:22
+    dir: statistics-service-node
+    entrypoint: npm
+    args: ["ci"]
+
+  - id: node-typecheck
+    name: node:22
+    dir: statistics-service-node
+    entrypoint: npm
+    args: ["run", "typecheck"]
+
+  - id: node-test
+    name: node:22
+    dir: statistics-service-node
+    entrypoint: npm
+    args: ["test"]
+
+  # Reuse /workspace dist from node-test and /workspace Go runtime from expose-go-runtime.
+  - id: integration-go-node
+    name: node:22
+    dir: qr-service-go
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        export PATH="/workspace/.ci-tools/go/bin:$${PATH}"
+        test -f /workspace/statistics-service-node/dist/src/app.js
+        node --version
+        go version
+        go test -tags=integration ./integration
+
+  - id: docker-build-go
+    name: gcr.io/cloud-builders/docker
+    args: ["build", "-t", "matrix-qr-go:ci", "./qr-service-go"]
+
+  - id: docker-build-node
+    name: gcr.io/cloud-builders/docker
+    args: ["build", "-t", "matrix-qr-statistics:ci", "./statistics-service-node"]
