@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 
 	"github.com/gofiber/fiber/v2"
@@ -13,10 +14,17 @@ import (
 )
 
 func main() {
-	cfg := configs.Load()
+	cfg, err := configs.Load()
+	if err != nil {
+		log.Fatalf("failed to load configuration: %v", err)
+	}
+
+	statisticsClient, err := clients.NewHTTPStatisticsClientWithAuth(context.Background(), cfg.StatisticsServiceURL, cfg.StatisticsTimeout, cfg.StatisticsAuthMode)
+	if err != nil {
+		log.Fatalf("failed to initialize statistics client: %v", err)
+	}
 
 	validator := services.NewMatrixValidator()
-	statisticsClient := clients.NewHTTPStatisticsClient(cfg.StatisticsServiceURL, cfg.StatisticsTimeout)
 	qrService := services.NewQRService(validator, statisticsClient)
 	qrHandler := handlers.NewQRHandler(qrService)
 
