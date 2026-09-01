@@ -1,0 +1,96 @@
+timeout: "1200s"
+
+steps:
+  - id: build-node-image
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - southamerica-west1-docker.pkg.dev/matrix-qr-analytics-507313-s6/matrix-qr/statistics-service-node:$SHORT_SHA
+      - ./statistics-service-node
+
+  - id: push-node-image
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - southamerica-west1-docker.pkg.dev/matrix-qr-analytics-507313-s6/matrix-qr/statistics-service-node:$SHORT_SHA
+
+  - id: build-go-image
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - southamerica-west1-docker.pkg.dev/matrix-qr-analytics-507313-s6/matrix-qr/qr-service-go:$SHORT_SHA
+      - ./qr-service-go
+
+  - id: push-go-image
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - southamerica-west1-docker.pkg.dev/matrix-qr-analytics-507313-s6/matrix-qr/qr-service-go:$SHORT_SHA
+
+  - id: deploy-node-private
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - matrix-qr-statistics
+      - --platform=managed
+      - --region=southamerica-west1
+      - --image=southamerica-west1-docker.pkg.dev/matrix-qr-analytics-507313-s6/matrix-qr/statistics-service-node:$SHORT_SHA
+      - --port=3000
+      - --no-allow-unauthenticated
+
+  - id: resolve-node-url
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        NODE_URL="$(gcloud run services describe matrix-qr-statistics --region=southamerica-west1 --format='value(status.url)')"
+        if [ -z "$${NODE_URL}" ]; then
+          echo "Failed to resolve matrix-qr-statistics URL." >&2
+          exit 1
+        fi
+        echo -n "$${NODE_URL}" > /workspace/.node_service_url
+
+  - id: deploy-go-public
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        NODE_URL="$(cat /workspace/.node_service_url)"
+        gcloud run deploy matrix-qr-api \
+          --platform=managed \
+          --region=southamerica-west1 \
+          --image=southamerica-west1-docker.pkg.dev/matrix-qr-analytics-507313-s6/matrix-qr/qr-service-go:$SHORT_SHA \
+          --port=8080 \
+          --service-account=matrix-qr-go-sa@matrix-qr-analytics-507313-s6.iam.gserviceaccount.com \
+          --allow-unauthenticated \
+          --set-env-vars=STATISTICS_SERVICE_URL=$${NODE_URL},STATISTICS_AUTH_MODE=google-id-token,STATISTICS_TIMEOUT_MS=5000
+
+  - id: smoke-test-go-service
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        API_URL="$(gcloud run services describe matrix-qr-api --region=southamerica-west1 --format='value(status.url)')"
+        if [ -z "$${API_URL}" ]; then
+          echo "Failed to resolve matrix-qr-api URL." >&2
+          exit 1
+        fi
+
+        curl -fsS "$${API_URL}/health" > /workspace/.smoke_health.json
+
+        RESPONSE="$(curl -fsS -X POST "$${API_URL}/api/v1/qr" -H "Content-Type: application/json" -d '{"matrix":[[1,2,3],[4,5,6]]}')"
+        echo "$${RESPONSE}" > /workspace/.smoke_qr_response.json
+
+        echo "$${RESPONSE}" | grep -q '"q"'
+        echo "$${RESPONSE}" | grep -q '"r"'
+        echo "$${RESPONSE}" | grep -q '"statistics"'
