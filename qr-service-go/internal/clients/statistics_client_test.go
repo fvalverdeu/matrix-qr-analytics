@@ -1,6 +1,7 @@
 package clients
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -279,5 +280,68 @@ func assertUnavailableError(t *testing.T, err error) {
 	var unavailableErr *UnavailableError
 	if !errors.As(err, &unavailableErr) {
 		t.Fatalf("expected *UnavailableError, got %T (%v)", err, err)
+	}
+}
+
+func TestNewHTTPStatisticsClientWithAuth_NoneModePreservesBehavior(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "" {
+			t.Fatalf("did not expect Authorization header in none mode")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"max":1,"min":1,"average":1,"sum":1,"hasDiagonalMatrix":true}`))
+	}))
+	defer server.Close()
+
+	client, err := NewHTTPStatisticsClientWithAuth(context.Background(), server.URL, 750*time.Millisecond, StatisticsAuthModeNone)
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+
+	if client.httpClient.Timeout != 750*time.Millisecond {
+		t.Fatalf("expected timeout %v, got %v", 750*time.Millisecond, client.httpClient.Timeout)
+	}
+
+	_, err = client.CalculateStatistics([][]float64{{1}}, [][]float64{{1}})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+}
+
+func TestNewHTTPStatisticsClientWithAuth_GoogleIDTokenUsesFactoryAndPreservesTimeout(t *testing.T) {
+	originalFactory := newIDTokenHTTPClient
+	t.Cleanup(func() {
+		newIDTokenHTTPClient = originalFactory
+	})
+
+	called := false
+	gotAudience := ""
+	newIDTokenHTTPClient = func(ctx context.Context, audience string) (*http.Client, error) {
+		called = true
+		gotAudience = audience
+		return &http.Client{}, nil
+	}
+
+	client, err := NewHTTPStatisticsClientWithAuth(context.Background(), "https://example.run.app/", 900*time.Millisecond, StatisticsAuthModeGoogleIDToken)
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+
+	if !called {
+		t.Fatal("expected Google ID token client factory to be called")
+	}
+	if gotAudience != "https://example.run.app" {
+		t.Fatalf("expected audience to be base URL without trailing slash, got %q", gotAudience)
+	}
+	if client.httpClient.Timeout != 900*time.Millisecond {
+		t.Fatalf("expected timeout %v, got %v", 900*time.Millisecond, client.httpClient.Timeout)
+	}
+}
+
+func TestNewHTTPStatisticsClientWithAuth_UnsupportedModeReturnsError(t *testing.T) {
+	_, err := NewHTTPStatisticsClientWithAuth(context.Background(), "https://example.run.app", 500*time.Millisecond, "unsupported")
+	if err == nil {
+		t.Fatal("expected error for unsupported auth mode")
 	}
 }
