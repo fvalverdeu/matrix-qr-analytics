@@ -21,6 +21,39 @@ The Go QR Service is the public facade and orchestrator.
 The Node Statistics Service is an internal specialized service.
 In local Docker Compose both services are reachable on localhost for development/debugging, but the Node service remains conceptually internal.
 
+## Environment Topologies
+
+### Local topology (Docker Compose)
+
+```mermaid
+flowchart LR
+  Client --> GoLocal[Go QR Service :8080]
+  GoLocal -->|HTTP POST /api/v1/statistics| NodeLocal[Node Statistics Service :3000]
+```
+
+Characteristics:
+
+- `docker-compose.yml` orchestrates both services.
+- Service-to-service routing uses Compose networking.
+- Local mode typically uses `STATISTICS_AUTH_MODE=none`.
+
+### Cloud topology (Google Cloud)
+
+```mermaid
+flowchart LR
+  Client --> GoCloud[matrix-qr-api<br/>Public Cloud Run]
+  GoCloud -->|HTTP POST /api/v1/statistics<br/>Google ID token| NodeCloud[matrix-qr-statistics<br/>Private Cloud Run]
+```
+
+Characteristics:
+
+- Both backend services run on Cloud Run in `southamerica-west1`.
+- Go service `matrix-qr-api` is public.
+- Node service `matrix-qr-statistics` is private.
+- Go calls Node with `STATISTICS_AUTH_MODE=google-id-token`.
+- The ID token audience is the Node service base URL.
+- Go runtime identity has Cloud Run invoker permission on the private Node service.
+
 ## Service Responsibilities
 
 ### Go QR Service
@@ -126,11 +159,23 @@ Semantics:
 
 Each service is packaged as its own Docker image.
 
-`docker-compose.yml` runs both services on a shared bridge network, exposes local ports for development, and configures Go to reach Node via service hostname (`http://statistics-service-node:3000`).
+Local container deployment:
+
+- `docker-compose.yml` runs both services on a shared bridge network.
+- Local ports are exposed for development.
+- Go reaches Node via Compose service hostname (`http://statistics-service-node:3000`).
+
+Cloud deployment:
+
+- Artifact Registry repository `matrix-qr` stores both service images.
+- Cloud Build CI pipeline: `cloudbuild/ci.yaml`.
+- Cloud Build CD pipeline: `cloudbuild/deploy.yaml`.
+- CD deploys private Node first, resolves Node Cloud Run URL dynamically, then deploys public Go with cloud auth env configuration.
+- Runtime identities are dedicated per service account for Go and Node services.
 
 Compose startup dependency uses Node health status (`depends_on` with `service_healthy`) before Go starts.
 
-No cloud deployment, Kubernetes deployment, or CI/CD deployment pipeline is part of the current implementation architecture.
+No Kubernetes deployment is part of the current implementation architecture.
 
 ## Testability Characteristics
 

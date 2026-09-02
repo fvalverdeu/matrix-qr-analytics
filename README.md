@@ -36,7 +36,7 @@ In local Docker Compose, both services are reachable on localhost for developmen
 
 - Go QR Service: Go 1.24+, Fiber, Gonum.
 - Statistics Service: Node.js 22+, TypeScript, Express 4.x.
-- Infrastructure: Docker, Docker Compose.
+- Infrastructure: Docker, Docker Compose, Google Cloud Run, Artifact Registry, Cloud Build.
 - API documentation: OpenAPI 3.1, Scalar static reference.
 - API testing: Postman collection.
 - Testing: Go built-in testing package; Node built-in `node:test`.
@@ -55,6 +55,10 @@ In local Docker Compose, both services are reachable on localhost for developmen
 - Node.js 22+
 - npm
 
+### Cloud operations
+
+- Google Cloud SDK (`gcloud`) for manual deployment and operational commands (not required for local application execution)
+
 ## Configuration
 
 Configuration sources in this repository:
@@ -71,6 +75,7 @@ Environment variables currently used:
 | `STATISTICS_SERVICE_PORT` | Docker Compose | Host port mapped to Node service container port 3000 | `3000` | No |
 | `STATISTICS_TIMEOUT_MS` | Go service | Timeout for Go -> Node HTTP call (milliseconds) | `5000` | No |
 | `STATISTICS_SERVICE_URL` | Go service | Base URL for Node statistics endpoint | none in code | Yes for direct local Go run |
+| `STATISTICS_AUTH_MODE` | Go service | Outbound auth mode to Statistics Service (`none` or `google-id-token`) | `none` | No |
 | `PORT` | Go and Node processes | Service listen port | Go: `8080`, Node: `3000` | No |
 
 Important env behavior:
@@ -78,6 +83,49 @@ Important env behavior:
 - Docker Compose reads root `.env` values when present.
 - Go does not auto-load `.env` files; it reads process environment variables.
 - Node loads dotenv in `src/index.ts`, so running from `statistics-service-node` can use `statistics-service-node/.env`.
+
+## Cloud Deployment (GCP)
+
+The cloud deployment runs on Google Cloud in project `matrix-qr-analytics-507313-s6`, region `southamerica-west1`.
+
+Services:
+
+- `matrix-qr-api` (public Cloud Run service): Go QR facade/orchestrator.
+- `matrix-qr-statistics` (private Cloud Run service): Node statistics processor.
+
+Container images are stored in Artifact Registry repository `matrix-qr`:
+
+- `southamerica-west1-docker.pkg.dev/matrix-qr-analytics-507313-s6/matrix-qr/qr-service-go`
+- `southamerica-west1-docker.pkg.dev/matrix-qr-analytics-507313-s6/matrix-qr/statistics-service-node`
+
+### Runtime identities
+
+- Go runtime service account: `matrix-qr-go-sa@matrix-qr-analytics-507313-s6.iam.gserviceaccount.com`
+- Node runtime service account: `matrix-qr-statistics-sa@matrix-qr-analytics-507313-s6.iam.gserviceaccount.com`
+
+The Go runtime identity has Cloud Run invoker access to the private Node service.
+
+## CI/CD
+
+Cloud Build pipelines are versioned in this repository:
+
+- CI: `cloudbuild/ci.yaml`
+- CD: `cloudbuild/deploy.yaml`
+
+CI validates Go, Node, Go->Node integration, and both Docker builds.
+CD builds and pushes both images, deploys private Node first, resolves Node URL dynamically, deploys public Go, and runs smoke tests.
+
+## Cloud Run Service-to-Service Authentication
+
+Go supports explicit outbound authentication modes through `STATISTICS_AUTH_MODE`:
+
+- `none`: local/default mode, plain HTTP behavior.
+- `google-id-token`: Cloud Run production mode using ADC/runtime identity.
+
+In cloud deployment mode:
+
+- `STATISTICS_SERVICE_URL` points to the private Node Cloud Run base URL.
+- Go requests include a Google-signed ID token with audience set to that base URL.
 
 ## Running with Docker Compose
 
@@ -278,6 +326,18 @@ Error behavior summary:
 
 Refer to `docs/openapi.yaml` or `docs/api-reference.html` for exact error response contracts.
 
+## Observability
+
+Cloud Run native observability is used:
+
+- Request logs in Cloud Logging.
+- Container stdout/stderr application logs.
+- Cloud Monitoring service metrics, including `run.googleapis.com/request_count`.
+
+A `matrix-qr-api-5xx-alert` monitoring policy is configured and validated for 5xx responses on the public Go service.
+
+See `docs/observability.md` for log queries, diagnosis workflow, and alert configuration details.
+
 ## Project Structure
 
 ```text
@@ -307,7 +367,11 @@ matrix-qr-analytics/
 │   ├── api-reference.html
 │   ├── architecture.md
 │   ├── assumptions.md
+│   ├── observability.md
 │   └── challenge-spec.md
+├── cloudbuild/
+│   ├── ci.yaml
+│   └── deploy.yaml
 ├── postman/
 │   └── Matrix-QR-Analytics.postman_collection.json
 ├── docker-compose.yml
@@ -323,8 +387,9 @@ matrix-qr-analytics/
 - Go is the facade/orchestrator; Node is the specialized statistics service.
 - Rectangular matrices are supported across square, tall, and wide shapes.
 - Statistics aggregate values from both Q and R.
-- JWT/authentication is not implemented in current scope.
-- Frontend, cloud deployment, and CI/CD are not implemented in current scope.
+- End-user JWT/authentication is not implemented in current scope.
+- Cloud deployment and CI/CD are implemented for backend services.
+- Frontend is not implemented in current scope.
 
 Deeper context:
 
