@@ -80,7 +80,9 @@ The Go service also treats invalid downstream success contracts as unavailabilit
 
 ## Security
 
-JWT authentication is considered optional and is not included in the initial implementation.
+End-user JWT authentication is considered optional and is not included in the current API scope.
+
+Service-to-service authentication between Go and Node is implemented for cloud runtime mode using Google ID tokens and Cloud Run IAM.
 
 ---
 
@@ -89,10 +91,10 @@ JWT authentication is considered optional and is not included in the initial imp
 The current implementation scope excludes:
 
 - frontend application
-- cloud deployment
-- CI/CD pipeline
 
-These items are not required for the current backend runtime architecture and may be addressed independently.
+Cloud deployment and CI/CD pipelines are implemented for backend services.
+
+The frontend can be addressed independently without changing the current backend runtime architecture.
 
 ---
 

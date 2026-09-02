@@ -115,10 +115,23 @@ Suggested initial policy name:
 
 - matrix-qr-api-5xx-alert
 
+Current status:
+
+- `matrix-qr-api-5xx-alert` is created and validated.
+
 After creation, verify policy by:
 
 - Reviewing recent incidents.
 - Correlating with Cloud Logging request and application logs.
+
+Validation example used in this project:
+
+- A controlled downstream failure produced:
+  - Go API `502` response (`STATISTICS_UNAVAILABLE`),
+  - Go application failure log,
+  - Cloud Run request log entry,
+  - Monitoring incident,
+  - notification email.
 
 ## Operational Notes
 
