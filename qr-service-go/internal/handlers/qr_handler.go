@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"log"
 
 	"github.com/gofiber/fiber/v2"
 
@@ -50,6 +51,8 @@ func (h *QRHandler) Decompose(c *fiber.Ctx) error {
 				},
 			})
 		}
+
+		log.Printf("qr_handler: unexpected processing error method=%s path=%s error_type=%T", c.Method(), c.Path(), err)
 
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
 			Error: models.APIError{

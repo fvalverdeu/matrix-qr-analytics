@@ -36,6 +36,14 @@ export function createStatisticsController(statisticsService: StatisticsService)
         });
       }
 
+      if (error instanceof Error) {
+        console.error('[statistics.controller] unexpected error in POST /api/v1/statistics', {
+          name: error.name,
+        });
+      } else {
+        console.error('[statistics.controller] unexpected non-error throwable in POST /api/v1/statistics');
+      }
+
       return res.status(500).json({
         error: {
           code: 'INTERNAL_ERROR',
