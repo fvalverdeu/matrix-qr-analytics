@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -18,6 +19,7 @@ import (
 const (
 	StatisticsAuthModeNone          = "none"
 	StatisticsAuthModeGoogleIDToken = "google-id-token"
+	statisticsOperationPath         = "/api/v1/statistics"
 )
 
 var newIDTokenHTTPClient = func(ctx context.Context, audience string) (*http.Client, error) {
@@ -75,42 +77,50 @@ func buildHTTPClient(ctx context.Context, audience string, authMode string) (*ht
 
 func (c *HTTPStatisticsClient) CalculateStatistics(q, r [][]float64) (models.Statistics, error) {
 	if c.baseURL == "" {
+		log.Printf("statistics_client: failure_stage=config operation=%s reason=empty_base_url", statisticsOperationPath)
 		return models.Statistics{}, newUnavailableError("Statistics service is unavailable")
 	}
 
 	payload, err := json.Marshal(models.StatisticsRequest{Q: q, R: r})
 	if err != nil {
+		log.Printf("statistics_client: failure_stage=marshal_request operation=%s error_type=%T", statisticsOperationPath, err)
 		return models.Statistics{}, newUnavailableError("Statistics service is unavailable")
 	}
 
-	url := c.baseURL + "/api/v1/statistics"
+	url := c.baseURL + statisticsOperationPath
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(payload))
 	if err != nil {
+		log.Printf("statistics_client: failure_stage=create_request operation=%s error_type=%T", statisticsOperationPath, err)
 		return models.Statistics{}, newUnavailableError("Statistics service is unavailable")
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
+		log.Printf("statistics_client: failure_stage=downstream_request operation=%s error_type=%T", statisticsOperationPath, err)
 		return models.Statistics{}, newUnavailableError("Statistics service is unavailable")
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
+		log.Printf("statistics_client: failure_stage=read_response operation=%s downstream_status=%d error_type=%T", statisticsOperationPath, resp.StatusCode, err)
 		return models.Statistics{}, newUnavailableError("Statistics service is unavailable")
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		log.Printf("statistics_client: failure_stage=downstream_non_200 operation=%s downstream_status=%d", statisticsOperationPath, resp.StatusCode)
 		return models.Statistics{}, newUnavailableError("Statistics service is unavailable")
 	}
 
 	var statisticsDTO statisticsResponseDTO
 	if err := json.Unmarshal(body, &statisticsDTO); err != nil {
+		log.Printf("statistics_client: failure_stage=decode_response operation=%s error_type=%T", statisticsOperationPath, err)
 		return models.Statistics{}, newUnavailableError("Statistics service is unavailable")
 	}
 
 	if statisticsDTO.Max == nil || statisticsDTO.Min == nil || statisticsDTO.Average == nil || statisticsDTO.Sum == nil || statisticsDTO.HasDiagonalMatrix == nil {
+		log.Printf("statistics_client: failure_stage=validate_response_contract operation=%s", statisticsOperationPath)
 		return models.Statistics{}, newUnavailableError("Statistics service is unavailable")
 	}
 
