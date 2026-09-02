@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
+import { analyzeQrMatrix, QrApiError } from './api/qrApi'
 import { MatrixEditor } from './components/MatrixEditor'
+import type { QrResponse } from './types/qr'
 
 const MIN_DIMENSION = 1
 const MAX_DIMENSION = 10
@@ -48,6 +50,24 @@ function isCellValueValid(rawValue: string): boolean {
   return Number.isFinite(Number(trimmed))
 }
 
+function toNumericMatrix(matrix: MatrixInput): number[][] | null {
+  const result: number[][] = []
+
+  for (const row of matrix) {
+    const parsedRow: number[] = []
+    for (const cellValue of row) {
+      if (!isCellValueValid(cellValue)) {
+        return null
+      }
+
+      parsedRow.push(Number(cellValue.trim()))
+    }
+    result.push(parsedRow)
+  }
+
+  return result
+}
+
 function App() {
   const [rows, setRows] = useState<number>(DEFAULT_ROWS)
   const [columns, setColumns] = useState<number>(DEFAULT_COLUMNS)
@@ -56,9 +76,13 @@ function App() {
   const [matrix, setMatrix] = useState<MatrixInput>(
     createMatrix(DEFAULT_ROWS, DEFAULT_COLUMNS),
   )
+  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false)
+  const [analysisErrorMessage, setAnalysisErrorMessage] = useState<string | null>(null)
+  const [analysisResult, setAnalysisResult] = useState<QrResponse | null>(null)
   const hasInvalidCells = matrix.some((row) =>
     row.some((value) => !isCellValueValid(value)),
   )
+  const canAnalyze = !hasInvalidCells && !isAnalyzing
 
   const dimensionLimits = useMemo(
     () => ({ min: MIN_DIMENSION, max: MAX_DIMENSION }),
@@ -157,6 +181,36 @@ function App() {
     setMatrix(createMatrix(DEFAULT_ROWS, DEFAULT_COLUMNS))
   }
 
+  const handleAnalyze = async () => {
+    const numericMatrix = toNumericMatrix(matrix)
+    if (!numericMatrix) {
+      setAnalysisResult(null)
+      setAnalysisErrorMessage(
+        'Please enter finite numeric values in all cells before analysis.',
+      )
+      return
+    }
+
+    setIsAnalyzing(true)
+    setAnalysisErrorMessage(null)
+    setAnalysisResult(null)
+
+    try {
+      const result = await analyzeQrMatrix({ matrix: numericMatrix })
+      setAnalysisResult(result)
+    } catch (error) {
+      if (error instanceof QrApiError) {
+        setAnalysisErrorMessage(error.message)
+      } else {
+        setAnalysisErrorMessage(
+          'An unexpected error occurred while analyzing the matrix. Please try again.',
+        )
+      }
+    } finally {
+      setIsAnalyzing(false)
+    }
+  }
+
   return (
     <main className="app-shell">
       <header className="app-header">
@@ -170,6 +224,8 @@ function App() {
         matrix={matrix}
         dimensionLimits={dimensionLimits}
         hasInvalidCells={hasInvalidCells}
+        canAnalyze={canAnalyze}
+        isAnalyzing={isAnalyzing}
         isCellValueValid={isCellValueValid}
         onRowsInputChange={handleRowsInputChange}
         onColumnsInputChange={handleColumnsInputChange}
@@ -178,7 +234,20 @@ function App() {
         onCellChange={handleCellChange}
         onLoadSample={handleLoadSample}
         onReset={handleReset}
+        onAnalyze={handleAnalyze}
       />
+
+      {analysisErrorMessage ? (
+        <p className="request-error" role="alert">
+          {analysisErrorMessage}
+        </p>
+      ) : null}
+
+      {analysisResult ? (
+        <p className="request-success" role="status" aria-live="polite">
+          Analysis completed successfully.
+        </p>
+      ) : null}
     </main>
   )
 }

@@ -136,6 +136,16 @@ body {
   cursor: not-allowed;
 }
 
+.request-error {
+  margin: 0.9rem 0 0;
+  color: #b91c1c;
+}
+
+.request-success {
+  margin: 0.9rem 0 0;
+  color: #065f46;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
