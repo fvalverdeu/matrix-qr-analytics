@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { analyzeQrMatrix, QrApiError } from './api/qrApi'
+import { AnalysisResults } from './components/AnalysisResults'
 import { MatrixEditor } from './components/MatrixEditor'
 import type { QrResponse } from './types/qr'
 
@@ -84,6 +85,11 @@ function App() {
   )
   const canAnalyze = !hasInvalidCells && !isAnalyzing
 
+  const clearAnalysisFeedback = () => {
+    setAnalysisErrorMessage(null)
+    setAnalysisResult(null)
+  }
+
   const dimensionLimits = useMemo(
     () => ({ min: MIN_DIMENSION, max: MAX_DIMENSION }),
     [],
@@ -98,6 +104,7 @@ function App() {
     setRowsInput(String(nextRows))
     setColumnsInput(String(nextColumns))
     setMatrix((current) => resizeMatrix(current, nextRows, nextColumns))
+    clearAnalysisFeedback()
   }
 
   const handleRowsCommit = (nextRows: number) => {
@@ -158,6 +165,7 @@ function App() {
       next[rowIndex][columnIndex] = rawValue
       return next
     })
+    clearAnalysisFeedback()
   }
 
   const handleLoadSample = () => {
@@ -171,6 +179,7 @@ function App() {
     setRowsInput(String(sample.length))
     setColumnsInput(String(sample[0].length))
     setMatrix(sample.map((row) => [...row]))
+    clearAnalysisFeedback()
   }
 
   const handleReset = () => {
@@ -179,6 +188,7 @@ function App() {
     setRowsInput(String(DEFAULT_ROWS))
     setColumnsInput(String(DEFAULT_COLUMNS))
     setMatrix(createMatrix(DEFAULT_ROWS, DEFAULT_COLUMNS))
+    clearAnalysisFeedback()
   }
 
   const handleAnalyze = async () => {
@@ -244,9 +254,12 @@ function App() {
       ) : null}
 
       {analysisResult ? (
-        <p className="request-success" role="status" aria-live="polite">
-          Analysis completed successfully.
-        </p>
+        <>
+          <p className="request-success" role="status" aria-live="polite">
+            Analysis completed successfully.
+          </p>
+          <AnalysisResults result={analysisResult} />
+        </>
       ) : null}
     </main>
   )
