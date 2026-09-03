@@ -9,6 +9,8 @@ type MatrixEditorProps = {
     max: number
   }
   hasInvalidCells: boolean
+  canAnalyze: boolean
+  isAnalyzing: boolean
   isCellValueValid: (value: string) => boolean
   onRowsInputChange: (value: string) => void
   onColumnsInputChange: (value: string) => void
@@ -17,6 +19,7 @@ type MatrixEditorProps = {
   onCellChange: (rowIndex: number, columnIndex: number, rawValue: string) => void
   onLoadSample: () => void
   onReset: () => void
+  onAnalyze: () => void
 }
 
 export function MatrixEditor({
@@ -25,6 +28,8 @@ export function MatrixEditor({
   matrix,
   dimensionLimits,
   hasInvalidCells,
+  canAnalyze,
+  isAnalyzing,
   isCellValueValid,
   onRowsInputChange,
   onColumnsInputChange,
@@ -33,6 +38,7 @@ export function MatrixEditor({
   onCellChange,
   onLoadSample,
   onReset,
+  onAnalyze,
 }: MatrixEditorProps) {
   return (
     <section className="editor" aria-label="Matrix editor">
@@ -95,11 +101,16 @@ export function MatrixEditor({
         <p className="editor-hint" role="status" aria-live="polite">
           {hasInvalidCells
             ? 'Please enter finite numeric values in all cells before analysis.'
-            : 'Matrix input is ready. API analysis will be enabled in the integration step.'}
+            : 'Matrix input is ready for analysis.'}
         </p>
 
-        <button type="button" className="primary-action" disabled>
-          Analyze matrix (available in integration step)
+        <button
+          type="button"
+          className="primary-action"
+          disabled={!canAnalyze}
+          onClick={onAnalyze}
+        >
+          {isAnalyzing ? 'Analyzing...' : 'Analyze matrix'}
         </button>
       </div>
     </section>
